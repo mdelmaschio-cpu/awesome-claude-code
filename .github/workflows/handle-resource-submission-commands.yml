@@ -68,14 +68,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          # TODO: Consider emitting issue parsing output via GITHUB_OUTPUT to avoid temp files.
-          # First parse the issue to get resource data
-          python -m scripts.resources.parse_issue_form > resource_data.json
-          
-          # Create the PR with the resource
+          # Parse the issue to get resource data and emit it via GITHUB_OUTPUT
+          RESOURCE_DATA=$(python -m scripts.resources.parse_issue_form)
+          echo "resource_data=$RESOURCE_DATA" >> "$GITHUB_OUTPUT"
+
+          # Create the PR with the resource (inline JSON, no temp file needed)
           python -m scripts.resources.create_resource_pr \
             --issue-number $ISSUE_NUMBER \
-            --resource-data resource_data.json
+            --resource-data-json "$RESOURCE_DATA"
       
       - name: Comment on issue with results
         if: contains(github.event.comment.body, '/approve') && contains(github.event.issue.labels.*.name, 'validation-passed')
@@ -213,4 +213,4 @@ jobs:
       - name: Cleanup temporary files
         if: always()
         run: |
-          rm -f pr_result.json resource_data.json
+          rm -f pr_result.json
