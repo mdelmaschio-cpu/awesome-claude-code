@@ -76,7 +76,7 @@ def validate_generated_outputs(status_stdout: str, repo_root: str) -> None:
 
     allowed_files = {"README.md", "THE_RESOURCES_TABLE.csv"}
     allowed_prefixes = ("README_ALTERNATIVES/", "assets/")
-    ignored_files = {"resource_data.json", "pr_result.json"}
+    ignored_files = {"pr_result.json"}
     unexpected = [
         path
         for path in changed_paths
@@ -112,12 +112,17 @@ def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Create PR from approved resource submission")
     parser.add_argument("--issue-number", required=True, help="Issue number")
-    parser.add_argument("--resource-data", required=True, help="Path to resource data JSON file")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--resource-data", help="Path to resource data JSON file")
+    group.add_argument("--resource-data-json", help="Resource data as inline JSON string")
     args = parser.parse_args()
 
     # Load resource data
-    with open(args.resource_data) as f:
-        resource_data = json.load(f)
+    if args.resource_data_json:
+        resource_data = json.loads(args.resource_data_json)
+    else:
+        with open(args.resource_data) as f:
+            resource_data = json.load(f)
 
     # If the validation returned a structure with 'data' field, extract it
     if isinstance(resource_data, dict) and "data" in resource_data:
