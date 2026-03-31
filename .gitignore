@@ -22,6 +22,8 @@ venv/
 
 marketplace/
 
+docs/HOW_IT_LOOKS.md
+
 coverage.xml
 
 !.claude/
