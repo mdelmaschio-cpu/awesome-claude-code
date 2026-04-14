@@ -30,7 +30,7 @@ awesome-claude-code/
 │   ├── README_AWESOME.template.md
 │   └── footer.template.md
 ├── scripts/                      # 61 Python modules across 12 subsystems
-├── tests/                        # 10 pytest test files
+├── tests/                        # 19 pytest test files
 ├── tools/                        # Utility scripts (README tree updater)
 ├── docs/                         # User and developer documentation
 ├── assets/                       # SVG badges, headers (~4.9 MB)
@@ -146,6 +146,7 @@ All scripts are importable as modules (e.g., `python -m scripts.readme.generate_
 | Graphics | `scripts/graphics/` | Logo/branding SVG generation |
 | Testing | `scripts/testing/` | Regeneration cycle tests, TOC anchor validator |
 | Archive | `scripts/archive/` | Deprecated scripts (excluded from linting/coverage) |
+| Tools | `tools/readme_tree/` | Updates the file-tree block in `docs/README-GENERATION.md` |
 
 ### Path Resolution
 
@@ -182,16 +183,18 @@ REPO_ROOT = find_repo_root()
 
 ### Testing (Pytest)
 
-- Tests live in `tests/` directory
+- Tests live in `tests/` directory (19 test files)
 - Run with `make test` or `make coverage`
 - `scripts/archive/` and `scripts/testing/test_regenerate_cycle.py` excluded from coverage
 - Tests use a test CSV fixture, not `THE_RESOURCES_TABLE.csv` directly
+- `tests/temp-verify-override-autolock.temp.py` is a development artifact (not in the test suite; can be removed)
 
 ### Pre-Commit Hooks
 
 Hooks run automatically on `git commit`:
-- `check-added-large-files`, `check-yaml`, `check-json`, `check-merge-conflict`
+- `check-added-large-files`, `check-case-conflict`, `check-yaml`, `check-json`, `check-merge-conflict`
 - `detect-private-key` — prevents accidental credential commits
+- `end-of-file-fixer`, `mixed-line-ending` — normalize whitespace
 - `ruff` + `ruff-format` — auto-formats code
 - `make test` — runs full test suite
 - `check-readme-generated` — regenerates README and fails if diff detected
@@ -282,6 +285,14 @@ IDs are generated as `{category_prefix}-{first-8-chars-of-SHA256}`. Use `make ge
 The root `CLAUDE.md` is listed in `.gitignore` (individual developer files are not committed). The exception `!resources/**/CLAUDE.md` allows CLAUDE.md files inside the `resources/` directory (these are curated examples).
 
 `.claude/commands/evaluate-repository.md` is tracked; other `.claude/` contents are ignored.
+
+## Custom Claude Code Commands
+
+`.claude/commands/evaluate-repository.md` defines a `/evaluate-repository` slash command. It expands to a full static-analysis prompt for assessing Claude Code resources — scoring code quality, security, documentation, functionality, and repository hygiene. Use it when evaluating any resource before curation.
+
+## License Note
+
+The actual license is **CC-BY-NC-ND 4.0** (see `LICENSE` file). The `pyproject.toml` classifier currently lists MIT — this is a discrepancy. For any downstream use, the `LICENSE` file takes precedence.
 
 ## Dependencies
 
