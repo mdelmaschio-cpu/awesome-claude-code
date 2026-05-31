@@ -7,7 +7,7 @@ This file provides guidance to AI assistants working in this repository.
 **awesome-claude-code** is a curated list of Claude Code resources (slash-commands, CLAUDE.md files, skills, workflows, tooling, hooks, etc.). It uses a CSV-driven generation pipeline to produce multiple README styles from a single data source.
 
 - **Version**: 2.0.1
-- **License**: CC-BY-NC-ND 4.0
+- **License**: CC-BY-NC-ND 4.0 (the `LICENSE` file takes precedence over the MIT classifier in `pyproject.toml`)
 - **Python**: 3.11+
 
 ## Repository Layout
@@ -73,7 +73,24 @@ Defines all **9 categories** with IDs, prefixes, icons, subcategories, and order
 
 Allows manual field overrides for specific resource IDs (e.g., custom license values or `skip_validation: true` to skip URL checking). The `skip_validation: true` flag takes highest precedence over automated validation.
 
-## Development Workflows
+## Python Project Setup
+
+### Dependencies
+
+Defined in `pyproject.toml`:
+
+**Runtime**:
+- **PyGithub** ≥ 2.1.1 — GitHub API access
+- **PyYAML** ≥ 6.0.0 — Config and category loading
+
+**Development** (`pip install -e ".[dev]"`):
+- **requests** ≥ 2.31.0 — HTTP link validation
+- **python-dotenv** ≥ 1.0.0 — Environment config
+- **ruff** ≥ 0.1.0 — Linting and formatting
+- **mypy** ≥ 1.10.0 — Static type checking
+- **pytest** ≥ 8.0.0 — Test framework
+- **pytest-cov** ≥ 7.0.0 — Coverage reporting
+- **pre-commit** ≥ 3.5.0 — Git hook management
 
 ### Environment Setup
 
@@ -86,12 +103,23 @@ pre-commit install
 
 Locally, always use `venv/bin/python3`. In CI (`CI=true`), `python3` is used directly.
 
+Environment variables:
+- `GITHUB_TOKEN` — Avoid API rate limits during validation/release fetches
+- `PYTHONPATH` — Should point to repo root for module imports
+- `CI=true` — Switches Python interpreter from `venv/bin/python3` to `python3`
+- `.env` files are supported via `python-dotenv` in several scripts
+
+## Development Commands
+
+All common tasks are driven via `Makefile` (29 targets). Run `make help` to see the full list.
+
 ### Key Make Targets
 
 | Command | Purpose |
 |---|---|
 | `make ci` | Full CI: format-check + mypy + test + docs-tree-check |
 | `make test` | Run pytest tests |
+| `make coverage` | Run tests with coverage report |
 | `make format` | Auto-fix linting/formatting with ruff |
 | `make format-check` | Check formatting only (no fixes) |
 | `make mypy` | Run mypy type checks |
@@ -100,15 +128,18 @@ Locally, always use `venv/bin/python3`. In CI (`CI=true`), `python3` is used dir
 | `make validate` | Validate all resource URLs |
 | `make validate-single URL=<url>` | Validate one URL |
 | `make test-regenerate` | Delete READMEs, regenerate, verify no diff |
-| `make coverage` | Run tests with coverage report |
 | `make clean` | Remove caches and test artifacts |
+| `make clean-all` | Remove caches, artifacts, and venv/ |
 | `make docs-tree` | Update file tree in docs/README-GENERATION.md |
 | `make docs-tree-check` | Fail if docs tree is out of sync |
 | `make add-category` | Interactive tool to add a new category |
 | `make download-resources` | Download open-source resources to resources/ |
 | `make generate-resource-id` | Generate a new resource ID interactively |
+| `make install` | Install/upgrade Python dependencies |
 
 Always run `make ci` before committing. The `make generate` target runs `make sort` first automatically.
+
+## Data/Resource Management
 
 ### README Generation Pipeline
 
@@ -124,9 +155,21 @@ The four styles and their generators:
 - **Extra** (`generators/visual.py`) — SVG-heavy visual style
 - **Classic** (`generators/minimal.py`) — Plain markdown
 - **Awesome** (`generators/awesome.py`) — Standard awesome-list style
-- **Flat** (`generators/flat.py`) — 44 parameterized table views (9 categories × 4 sort modes + all-categories views)
+- **Flat** (`generators/flat.py`) — 44 parameterized table views
 
 Root style is controlled by `acc-config.yaml` → `readme.root_style` (currently `awesome`).
+
+### Do Not Modify Generated Files Directly
+
+`README.md` and all files in `README_ALTERNATIVES/` are generated. Edit the CSV or templates, then run `make generate`.
+
+### Key Script Behaviors
+
+- **validate_links.py**: Makes HTTP GET requests to all resource URLs with `User-Agent: awesome-claude-code Link Validator/2.0`, 10s timeout, exponential backoff. Updates `Active`, `Last Checked`, `Last Modified` in CSV. Respects `skip_validation: true` in resource-overrides.yaml.
+- **create_resource_pr.py**: Accepts `--issue-number` and `--resource-data-json` args, generates resource ID, appends to CSV, regenerates READMEs, creates branch, commits, and opens PR.
+- **badge_notification_core.py**: Sanitizes resource name/URL input, checks for dangerous protocol handlers and HTML/script injection before creating notifications.
+- **fetch_repo_ticker_data.py**: Queries GitHub Search API for Claude Code repos, calculates deltas vs previous run, updates `data/repo-ticker.csv` and generates SVG assets.
+- **github_utils.py**: Provides a cached `get_github_client()` with 0.5s request pacing to avoid rate limits.
 
 ## Scripts Architecture
 
@@ -157,13 +200,31 @@ from scripts.utils.repo_root import find_repo_root
 REPO_ROOT = find_repo_root()
 ```
 
-### Key Script Behaviors
+## Testing Approach
 
-- **validate_links.py**: Makes HTTP GET requests to all resource URLs with `User-Agent: awesome-claude-code Link Validator/2.0`, 10s timeout, exponential backoff. Updates `Active`, `Last Checked`, `Last Modified` in CSV. Respects `skip_validation: true` in resource-overrides.yaml.
-- **create_resource_pr.py**: Accepts `--issue-number` and `--resource-data-json` args, generates resource ID, appends to CSV, regenerates READMEs, creates branch, commits, and opens PR.
-- **badge_notification_core.py**: Sanitizes resource name/URL input using `validate_input_safety()` — checks for dangerous protocol handlers (`javascript:`, `data:`, `vbscript:`, `file:`) and HTML/script injection patterns before creating notifications.
-- **fetch_repo_ticker_data.py**: Queries GitHub Search API for `"claude code" claude-code in:name,readme,description`, calculates deltas vs previous run. Updates `data/repo-ticker.csv` and generates SVG assets.
-- **github_utils.py**: Provides a cached `get_github_client()` with 0.5s request pacing to avoid rate limits.
+### Pytest
+
+- Tests live in `tests/` directory (19 test files)
+- Run with `make test` or `make coverage`
+- `scripts/archive/` and `scripts/testing/test_regenerate_cycle.py` excluded from coverage
+- Tests use a test CSV fixture, not `THE_RESOURCES_TABLE.csv` directly
+- `tests/temp-verify-override-autolock.temp.py` is a development artifact (not in the test suite)
+
+### README Regeneration Tests
+
+- `make test-regenerate` — deletes READMEs, regenerates, verifies no diff vs committed state
+- `make test-regenerate-no-cleanup` — keeps outputs on failure for inspection
+- `make test-regenerate-cycle` — full root/style-order regeneration cycle test
+
+### Pre-Commit Hooks
+
+Hooks run automatically on `git commit`:
+- `check-added-large-files`, `check-case-conflict`, `check-yaml`, `check-json`, `check-merge-conflict`
+- `detect-private-key` — prevents accidental credential commits
+- `end-of-file-fixer`, `mixed-line-ending` — normalize whitespace
+- `ruff` + `ruff-format` — auto-formats code
+- `make test` — runs full test suite
+- `check-readme-generated` — regenerates README and fails if diff detected
 
 ## Code Quality Standards
 
@@ -181,27 +242,47 @@ REPO_ROOT = find_repo_root()
 - Run `make mypy` — covers `scripts/` and `tests/`
 - `resources/` is excluded from mypy
 
-### Testing (Pytest)
+## How to Contribute Resources
 
-- Tests live in `tests/` directory (19 test files)
-- Run with `make test` or `make coverage`
-- `scripts/archive/` and `scripts/testing/test_regenerate_cycle.py` excluded from coverage
-- Tests use a test CSV fixture, not `THE_RESOURCES_TABLE.csv` directly
-- `tests/temp-verify-override-autolock.temp.py` is a development artifact (not in the test suite; can be removed)
+### Resource Submission Flow
 
-### Pre-Commit Hooks
+1. User submits via GitHub Issues form (`recommend-resource.yml` template)
+2. `submission-enforcement-v2.yml` validates, enforces cooldown rules, classifies with Claude Haiku
+3. Maintainer reviews, posts `/approve` comment on the issue
+4. `handle-resource-submission-commands.yml` parses issue, calls `create_resource_pr.py`, opens PR
+5. On merge: `notify-on-merge.yml` triggers `badge_notification.py` to create an issue in the resource's repo
 
-Hooks run automatically on `git commit`:
-- `check-added-large-files`, `check-case-conflict`, `check-yaml`, `check-json`, `check-merge-conflict`
-- `detect-private-key` — prevents accidental credential commits
-- `end-of-file-fixer`, `mixed-line-ending` — normalize whitespace
-- `ruff` + `ruff-format` — auto-formats code
-- `make test` — runs full test suite
-- `check-readme-generated` — regenerates README and fails if diff detected
+### Adding a Resource Locally
+
+1. Add a row to `THE_RESOURCES_TABLE.csv` with a generated ID (`make generate-resource-id`)
+2. Run `make sort` to sort the CSV
+3. Run `make generate` to regenerate all READMEs
+4. Run `make ci` to verify everything passes
+
+### Adding a New Category
+
+Use the interactive tool: `make add-category` or `make add-category ARGS='--name "..." --prefix x --icon 🎯'`
+
+This updates `templates/categories.yaml` and regenerates relevant TOC assets. Do not hardcode category names in any script — always load from `categories.yaml`.
+
+### Resource ID Format
+
+IDs are generated as `{category_prefix}-{first-8-chars-of-SHA256}`. Use `make generate-resource-id` interactively or call `python -m scripts.ids.generate_resource_id`. Never hand-craft IDs.
+
+### Submission Enforcement (v2)
+
+`submission-enforcement-v2.yml` implements multi-stage enforcement:
+1. **Permanent ban check** — 3rd+ violation triggers permanent block
+2. **Active cooldown check** — 7 or 14 day escalating cooldowns
+3. **Missing label check** — Must use issue form (not ad-hoc issues)
+4. **Repo age check** — Source repo must be ≥ 1 week old
+5. **Claude classification** — Uses `claude-haiku-4-5-20251001` to classify submissions
+
+Cooldown state is stored in the private `awesome-claude-code-ops` repository (requires `ACC_OPS` secret).
 
 ## GitHub Workflows
 
-12 workflows handle the full resource lifecycle. The active production workflows are:
+12 workflows handle the full resource lifecycle:
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
@@ -217,25 +298,6 @@ Hooks run automatically on `git commit`:
 | `close-resource-pr.yml` / `close-resource-prs.yml` | PR open | Auto-close direct resource PRs (use issue form instead) |
 | `submission-enforcement.yml` | Issues | Legacy enforcement (superseded by v2) |
 
-### Resource Submission Flow
-
-1. User submits via GitHub Issues form (`recommend-resource.yml` template)
-2. `submission-enforcement-v2.yml` validates, enforces cooldown rules, classifies with Claude Haiku
-3. Maintainer reviews, posts `/approve` comment on the issue
-4. `handle-resource-submission-commands.yml` parses issue, calls `create_resource_pr.py`, opens PR
-5. On merge: `notify-on-merge.yml` triggers `badge_notification.py` to create an issue in the resource's repo
-
-### Submission Enforcement (v2)
-
-`submission-enforcement-v2.yml` implements multi-stage enforcement:
-1. **Permanent ban check** — 3rd+ violation triggers permanent block
-2. **Active cooldown check** — 7 or 14 day escalating cooldowns
-3. **Missing label check** — Must use issue form (not ad-hoc issues)
-4. **Repo age check** — Source repo must be ≥ 1 week old
-5. **Claude classification** — Uses `claude-haiku-4-5-20251001` to classify PRs as `resource_submission` or `not_resource_submission`
-
-Cooldown state is stored in the private `awesome-claude-code-ops` repository (requires `ACC_OPS` secret with fine-grained PAT).
-
 ## Secrets & Credentials
 
 | Secret | Scope | Used By |
@@ -247,40 +309,13 @@ Cooldown state is stored in the private `awesome-claude-code-ops` repository (re
 | `SC_DISPATCH_URL` | Custom webhook URL | submission-enforcement-v2 (intake dispatch) |
 | `SC_DISPATCH_TOKEN` | Webhook Bearer token | submission-enforcement-v2 (intake dispatch) |
 
-Environment variables used locally:
-- `GITHUB_TOKEN` — Avoid API rate limits during validation/release fetches
-- `PYTHONPATH` — Should point to repo root for module imports
-- `CI=true` — Switches Python interpreter from `venv/bin/python3` to `python3`
-- `.env` files are supported via `python-dotenv` in several scripts
-
 ## Key Conventions
-
-### Do Not Modify Generated Files Directly
-
-`README.md` and all files in `README_ALTERNATIVES/` are generated. Edit the CSV or templates, then run `make generate`.
-
-### Adding a New Resource
-
-1. Add a row to `THE_RESOURCES_TABLE.csv` with a generated ID (`make generate-resource-id`)
-2. Run `make sort` to sort the CSV
-3. Run `make generate` to regenerate all READMEs
-4. Run `make ci` to verify everything passes
-
-### Adding a New Category
-
-Use the interactive tool: `make add-category` or `make add-category ARGS='--name "..." --prefix x --icon 🎯'`
-
-This updates `templates/categories.yaml` and regenerates relevant TOC assets. Do not hardcode category names in any script — always load from `categories.yaml`.
 
 ### Modifying README Templates
 
 Templates are in `templates/README_*.template.md`. After editing, run `make generate` and `make test-regenerate` to confirm the output is stable (no diff after a fresh regeneration).
 
-### Resource ID Format
-
-IDs are generated as `{category_prefix}-{first-8-chars-of-SHA256}`. Use `make generate-resource-id` interactively or call `python -m scripts.ids.generate_resource_id`. Never hand-craft IDs.
-
-## gitignore Notes
+### gitignore Notes
 
 The root `CLAUDE.md` is listed in `.gitignore` (individual developer files are not committed). The exception `!resources/**/CLAUDE.md` allows CLAUDE.md files inside the `resources/` directory (these are curated examples).
 
@@ -293,11 +328,3 @@ The root `CLAUDE.md` is listed in `.gitignore` (individual developer files are n
 ## License Note
 
 The actual license is **CC-BY-NC-ND 4.0** (see `LICENSE` file). The `pyproject.toml` classifier currently lists MIT — this is a discrepancy. For any downstream use, the `LICENSE` file takes precedence.
-
-## Dependencies
-
-- **PyGithub** ≥ 2.1.1 — GitHub API access
-- **PyYAML** ≥ 6.0.0 — Config and category loading
-- **requests** ≥ 2.31.0 — HTTP link validation (dev)
-- **python-dotenv** ≥ 1.0.0 — Environment config (dev)
-- **ruff**, **mypy**, **pytest**, **pytest-cov**, **pre-commit** — Dev tooling
