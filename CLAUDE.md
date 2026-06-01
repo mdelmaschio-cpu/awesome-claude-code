@@ -16,7 +16,7 @@ This file provides guidance to AI assistants working in this repository.
 awesome-claude-code/
 ├── THE_RESOURCES_TABLE.csv       # Master data source (single source of truth)
 ├── README.md                     # Generated root README (style: awesome)
-├── README_ALTERNATIVES/          # 44+ generated README variants
+├── README_ALTERNATIVES/          # 47 generated README variants
 ├── acc-config.yaml               # Global README generation config
 ├── pyproject.toml                # Python project config + dependencies
 ├── Makefile                      # 29 targets for all common tasks
@@ -29,7 +29,7 @@ awesome-claude-code/
 │   ├── README_CLASSIC.template.md
 │   ├── README_AWESOME.template.md
 │   └── footer.template.md
-├── scripts/                      # 61 Python modules across 12 subsystems
+├── scripts/                      # 61 Python modules across 12 subsystems (47 non-archive)
 ├── tests/                        # 19 pytest test files
 ├── tools/                        # Utility scripts (README tree updater)
 ├── docs/                         # User and developer documentation
@@ -107,6 +107,8 @@ Locally, always use `venv/bin/python3`. In CI (`CI=true`), `python3` is used dir
 | `make add-category` | Interactive tool to add a new category |
 | `make download-resources` | Download open-source resources to resources/ |
 | `make generate-resource-id` | Generate a new resource ID interactively |
+| `make generate-toc-assets` | Regenerate subcategory TOC SVGs (run after adding subcategories) |
+| `make validate-toc` | Validate TOC anchors against GitHub HTML (requires `.claude/root-readme-html-article-body.html`) |
 
 Always run `make ci` before committing. The `make generate` target runs `make sort` first automatically.
 
@@ -117,14 +119,16 @@ THE_RESOURCES_TABLE.csv + templates/ + acc-config.yaml
         ↓
 scripts/readme/generate_readme.py
         ↓
-README.md (root style) + README_ALTERNATIVES/*.md (44 variants)
+README.md (root style) + README_ALTERNATIVES/*.md (47 variants: 3 named styles + 44 flat)
 ```
 
 The four styles and their generators:
 - **Extra** (`generators/visual.py`) — SVG-heavy visual style
 - **Classic** (`generators/minimal.py`) — Plain markdown
 - **Awesome** (`generators/awesome.py`) — Standard awesome-list style
-- **Flat** (`generators/flat.py`) — 44 parameterized table views (9 categories × 4 sort modes + all-categories views)
+- **Flat** (`generators/flat.py`) — 44 parameterized table views (10 category slugs × 4 sort modes + all-categories views)
+
+Generation runs in two phases: (1) generate all styles under `README_ALTERNATIVES/`, then (2) copy the configured `root_style` to `README.md`.
 
 Root style is controlled by `acc-config.yaml` → `readme.root_style` (currently `awesome`).
 
@@ -136,7 +140,7 @@ All scripts are importable as modules (e.g., `python -m scripts.readme.generate_
 |---|---|---|
 | README generation | `scripts/readme/` | Entry point + generators + helpers + markup |
 | Validation | `scripts/validation/` | URL validation, single resource checks |
-| Resources | `scripts/resources/` | CSV utilities, issue parsing, PR creation, download |
+| Resources | `scripts/resources/` | CSV utilities, issue parsing, PR creation, download, informal-submission detection |
 | Categories | `scripts/categories/` | Category management, add-category tool |
 | IDs | `scripts/ids/` | Resource ID generation |
 | Utilities | `scripts/utils/` | `repo_root.py`, `git_utils.py`, `github_utils.py` |
@@ -145,7 +149,7 @@ All scripts are importable as modules (e.g., `python -m scripts.readme.generate_
 | Ticker | `scripts/ticker/` | Animated ticker SVG + data fetching |
 | Graphics | `scripts/graphics/` | Logo/branding SVG generation |
 | Testing | `scripts/testing/` | Regeneration cycle tests, TOC anchor validator |
-| Archive | `scripts/archive/` | Deprecated scripts (excluded from linting/coverage) |
+| Archive | `scripts/archive/` | Placeholder for deprecated scripts (excluded from linting/coverage; currently empty) |
 | Tools | `tools/readme_tree/` | Updates the file-tree block in `docs/README-GENERATION.md` |
 
 ### Path Resolution
@@ -162,6 +166,7 @@ REPO_ROOT = find_repo_root()
 - **validate_links.py**: Makes HTTP GET requests to all resource URLs with `User-Agent: awesome-claude-code Link Validator/2.0`, 10s timeout, exponential backoff. Updates `Active`, `Last Checked`, `Last Modified` in CSV. Respects `skip_validation: true` in resource-overrides.yaml.
 - **create_resource_pr.py**: Accepts `--issue-number` and `--resource-data-json` args, generates resource ID, appends to CSV, regenerates READMEs, creates branch, commits, and opens PR.
 - **badge_notification_core.py**: Sanitizes resource name/URL input using `validate_input_safety()` — checks for dangerous protocol handlers (`javascript:`, `data:`, `vbscript:`, `file:`) and HTML/script injection patterns before creating notifications.
+- **detect_informal_submission.py**: Heuristic detector for resource submissions that bypass the issue template. Returns a confidence score (0.0–1.0) and one of three actions: `none` (< 0.4), `warn` (0.4–0.6), or `close` (≥ 0.6). Reads `ISSUE_TITLE` and `ISSUE_BODY` environment variables and writes GitHub Actions outputs.
 - **fetch_repo_ticker_data.py**: Queries GitHub Search API for `"claude code" claude-code in:name,readme,description`, calculates deltas vs previous run. Updates `data/repo-ticker.csv` and generates SVG assets.
 - **github_utils.py**: Provides a cached `get_github_client()` with 0.5s request pacing to avoid rate limits.
 
