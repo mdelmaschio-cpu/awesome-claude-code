@@ -63,11 +63,11 @@ Defines all **9 categories** with IDs, prefixes, icons, subcategories, and order
 | 2 | Workflows & Knowledge Guides | `wf` | 🧠 | General, Ralph Wiggum |
 | 3 | Tooling | `tool` | 🧰 | General, IDE Integrations, Usage Monitors, Orchestrators, Config Managers |
 | 4 | Status Lines | `status` | 📊 | General |
-| 5 | Hooks | `hook` | 🪝 | General |
+| 5 | Hooks | `hook` | 🪩 | General |
 | 6 | Slash-Commands | `cmd` | 🔪 | General, Version Control & Git, Code Analysis & Testing, Context Loading & Priming, Documentation & Changelogs, CI / Deployment, Project & Task Management, Miscellaneous |
 | 7 | CLAUDE.md Files | `claude` | 📂 | General, Language-Specific, Domain-Specific, Project Scaffolding & MCP |
 | 8 | Alternative Clients | `client` | 📱 | General |
-| 9 | Official Documentation | `doc` | 🏛️ | General |
+| 9 | Official Documentation | `doc` | 🏗️ | General |
 
 ### templates/resource-overrides.yaml
 
